@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>シンプル録音メモくん</title>
+<meta name="description" content="ブラウザだけで音声を録音・文字起こし・保存。無料は3件まで、無制限版で保存し放題。">
+<link rel="alternate" hreflang="en" href="https://mimimi-night.github.io/voice-recorder/en.html">
+    <meta name="robots" content="index,follow">
+<meta property="og:title" content="シンプル録音メモくん">
+<meta property="og:description" content="録音・文字起こし・保存。無料3件／無制限版あり。">
+<meta property="og:url" content="https://mimimi-night.github.io/voice-recorder/">
+<meta property="og:type" content="website">
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 20px; }
+        h1 { text-align: center; }
+        button { margin: 5px; padding: 8px 12px; cursor: pointer; }
+        #controls { display: flex; justify-content: center; margin-bottom: 10px; }
+        #recordings { margin-top: 15px; }
+        .record-item { border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: white; border-radius: 8px; }
+        audio { display: block; margin-top: 5px; }
+        .toolbar { display: flex; justify-content: center; margin-bottom: 15px; gap: 10px; }
+    </style>
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9973426115095779"
+     crossorigin="anonymous"></script>
+    
+</head>
+<body>
+<div style="position:absolute; top:10px; right:20px;">
+<a href="index.html">JP</a> |
+<a href="en.html">EN</a>
+</div>
+<h2>録音メモとは？</h2>
+<p>
+録音メモとは、音声を録音して保存できる便利なツールです。
+会議や授業、アイデアの記録などに活用できます。
+このサイトでは、無料で録音・文字起こし・保存が可能です。
+</p>
+
+<h2>こんな人におすすめ</h2>
+<ul>
+<li>会議内容を記録したい</li>
+<li>授業を録音して復習したい</li>
+<li>音声を文字起こししたい</li>
+</ul><div id="planBar"
+style="max-width:900px;
+margin:10px auto;
+padding:10px;
+border:1px solid #ddd;
+border-radius:8px;
+background:#fff;
+display:flex;
+flex-wrap:wrap;
+gap:12px;
+align-items:center;"> 
+<div id="planText">
+現在：無料版（残り <span id="remain">3</span> 件）
+</div>  <a id="buyLink" href="https://buy.stripe.com/test_eVqbJ11I50QIbul3a2gMw00" target="_blank" rel="noopener" style="background:#111;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;">無制限版にする（¥500）</a>
+</div>
+    <div id="controls">
+        <button id="startBtn">録音開始</button>
+        <button id="stopBtn" disabled>録音停止</button>
+        
+        <select id="sortSelect">
+            <option value="newest">新しい順</option>
+            <option value="oldest">古い順</option>
+            <option value="longest">長い順</option>
+            <option value="shortest">短い順</option>
+        </select>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 10px;">
+    <input type="text" id="searchInput" placeholder="🔍 キーワード検索（タイトル・日付・文字起こし）" style="width: 80%; padding: 8px;">
+</div>
+
+    <div class="toolbar">
+        <button id="deleteSelectedBtn">選択削除</button>
+        <button id="deleteAllBtn">全部削除</button>
+        <button id="downloadSelectedBtn">選択ダウンロード</button>
+        <button id="downloadAllBtn">全部ダウンロード</button>
+        <button id="unselectAllBtn">選択全部解除</button>
+    </div>
+
+    <p id="liveText">ここに録音中の文字が表示されます...</p>
+    <p id="recordingStatus" style="color: red; font-weight: bold; display: none;">🎙️ 録音中...</p>
+    <div id="recordings"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+
+    <script>
+
+    function normalizeText(text) {
+        return (text || "")
+            .toLowerCase()
+            .replace(/\s+/g, "") // 空白を削除
+            .replace(/[ぁ-ん]/g, ch =>
+                String.fromCharCode(ch.charCodeAt(0) + 0x60) // ひらがな→カタカナ
+            )
+            .replace(/[ー－―]/g, "") // 長音を削除
+            .normalize("NFKC"); // 全角→半角、濁点などの正規化
+    }
+
+const SpeechRecognitionClass =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognitionClass) {
+  alert("音声認識に対応していないブラウザです");
+}        
+const recognition = SpeechRecognitionClass
+  ? new SpeechRecognitionClass()
+  : null;
+        
+if (recognition) {
+  recognition.lang = 'ja-JP';
+}        recognition.interimResults = true;
+        recognition.continuous = true;
+
+        let isRecording = false;
+        let finalTranscript = "";
+        let tempTranscript = "";
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordings = JSON.parse(localStorage.getItem("recordings") || "[]");
+const FREE_LIMIT = 3;
+
+let isPro = localStorage.getItem('isPro') === '1';
+let freeRemain = parseInt(localStorage.getItem('freeRemain') ?? String(FREE_LIMIT), 10);
+
+if (Number.isNaN(freeRemain)) freeRemain = FREE_LIMIT;
+if (freeRemain < 0) freeRemain = 0;
+if (freeRemain > FREE_LIMIT) freeRemain = FREE_LIMIT;
+
+const buyLink = document.getElementById('buyLink');
+const planTextEl = document.getElementById('planText');
+
+const params = new URLSearchParams(location.search);
+if (params.get('pro') === '1') {
+  localStorage.setItem('isPro', '1');
+  isPro = true;
+  history.replaceState({}, '', location.pathname);
+}
+
+function updatePlanUI() {
+  const planTextEl = document.getElementById('planText');
+  const remainEl = document.getElementById('remain');
+  const startBtn = document.getElementById('startBtn');
+
+  if (!planTextEl) return;
+
+  if (isPro) {
+    planTextEl.textContent = '現在: 無制限版';
+    if (buyLink) buyLink.style.display = 'none';
+    if (startBtn) startBtn.disabled = false;
+    return;
+  }
+
+  planTextEl.innerHTML = `現在: 無料版（残り <span id="remain">${freeRemain}</span> 件）`;
+
+  if (startBtn) startBtn.disabled = freeRemain <= 0;
+}
+        
+// ?pro=1 で着地したら無制限を有効化（テスト運用用）
+if (params.get('pro') === '1') {
+  localStorage.setItem('isPro', '1');
+  isPro = true;
+  history.replaceState({}, '', location.pathname); // URLをきれいに戻す
+}
+updatePlanUI();
+        
+        // 録音番号を過去データから計算
+        let recordingCount = recordings.length > 0
+            ? Math.max(...recordings.map(r => parseInt(r.title.replace("録音 ", ""))))
+            : 0;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const liveText = document.getElementById('liveText');
+        const recordingsDiv = document.getElementById('recordings');
+        const sortSelect = document.getElementById('sortSelect');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        const deleteAllBtn = document.getElementById('deleteAllBtn');
+        const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+        async function initRecorder() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (e) => {
+                audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioURL = URL.createObjectURL(audioBlob);
+
+                const title = `録音 ${++recordingCount}`;
+                const date = new Date().toLocaleString("ja-JP", {
+                    year: "numeric", month: "long", day: "numeric",
+                    hour: "2-digit", minute: "2-digit"
+                });
+
+                const newRecording = {
+                    id: Date.now(),
+                    title,
+                    audioURL,
+                    transcript: finalTranscript || tempTranscript || "（文字なし）",
+                    date,
+                    duration: Math.round(audioBlob.size / 16000)
+                };
+
+                recordings.push(newRecording);
+                localStorage.setItem("recordings", JSON.stringify(recordings));
+
+                audioChunks = [];
+                finalTranscript = "";
+                tempTranscript = "";
+                liveText.textContent = "ここに録音中の文字が表示されます...";
+
+                renderRecordings();
+            };
+        }
+
+        initRecorder();
+
+        startBtn.addEventListener('click', () => {
+              // 無料版の保存上限チェック
+  if (!isPro && recordings.length >= FREE_LIMIT) {
+    alert(`無料版は ${FREE_LIMIT} 件まで保存できます。無制限版のご利用をご検討ください。`);
+    return;
+  }
+            
+            if (mediaRecorder && mediaRecorder.state === "inactive") {
+                mediaRecorder.start();
+            }
+
+            isRecording = true;
+            finalTranscript = "";
+            tempTranscript = "";
+            recognition.start();
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+
+            // 録音中の表示
+            const recordingStatus = document.getElementById('recordingStatus');
+            recordingStatus.textContent = "🎙️ 録音中...";
+            recordingStatus.style.color = "red";
+            recordingStatus.style.display = "block";
+        });
+
+        stopBtn.addEventListener('click', () => {
+          //最後のリアルタイム文字を保存してから録音停止
+finalTranscript += tempTranscript;
+          tempTranscript = "";
+
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            // 音声認識を停止してリアルタイム文字起こしを強制クリア
+               recognition.stop();
+             liveText.textContent = "ここに録音中の文字が表示されます...";
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+
+            const recordingStatus = document.getElementById('recordingStatus');
+recordingStatus.style.display = "none";
+
+            // リアルタイムの途中経過テキストを消す
+              tempTranscript = "";
+              liveText.textContent = "ここに録音中の文字が表示されます...";
+
+        });
+
+        recognition.addEventListener('result', (event) => {
+            tempTranscript = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                    finalTranscript += result[0].transcript;
+                } else {
+                    tempTranscript = result[0].transcript;
+                }
+            }
+            liveText.textContent = finalTranscript + tempTranscript;
+        });
+
+        recognition.addEventListener('end', () => {
+            if (isRecording) {recognition.start();
+
+          } else {
+                // 録音停止時は必ずリアルタイム文字をクリア
+                tempTranscript = "";
+                liveText.textContent = "ここに録音中の文字が表示されます...";
+                // -------------------
+            }
+
+        });
+
+        function renderRecordings() {
+            recordingsDiv.innerHTML = "";
+
+            const keyword = normalizeText(searchInput.value);
+
+               let filteredRecordings = recordings.filter(rec => {
+                   const title = normalizeText(rec.title || "");
+                   const date = normalizeText(rec.date || "");
+                   const transcript = normalizeText(rec.transcript || "");
+
+                   return (
+                       title.includes(keyword) ||
+                       date.includes(keyword) ||
+                       transcript.includes(keyword)
+                   );
+
+            });
+            let sorted = [...filteredRecordings];
+
+            switch (sortSelect.value) {
+                case "newest": sorted.sort((a, b) => b.id - a.id); break;
+                case "oldest": sorted.sort((a, b) => a.id - b.id); break;
+                case "longest": sorted.sort((a, b) => b.duration - a.duration); break;
+                case "shortest": sorted.sort((a, b) => a.duration - b.duration); break;
+            }
+
+            sorted.forEach((rec) => {
+                const recordItem = document.createElement('div');
+                recordItem.className = 'record-item';
+
+                recordItem.innerHTML = `
+                    <input type="checkbox" class="selectRecording" data-id="${rec.id}">
+                    <input type="text" class="editTitle" data-id="${rec.id}" value="${rec.title}" />
+                    <p>（${rec.date}）</p>
+                    <audio controls src="${rec.audioURL}"></audio>
+                    <p>⏱ 長さ: ${rec.duration}秒</p>
+                    <p>📝 <strong>文字起こし:</strong><br>${rec.transcript || "（文字なし）"}</p>
+                `;
+
+                recordingsDiv.appendChild(recordItem);
+            });
+
+            document.querySelectorAll('.editTitle').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const id = Number(e.target.dataset.id);
+                    const newTitle = e.target.value;
+                    const recIndex = recordings.findIndex(r => r.id === id);
+                    if (recIndex !== -1) {
+                        recordings[recIndex].title = newTitle;
+                        localStorage.setItem("recordings", JSON.stringify(recordings));
+                    }
+                });
+            });
+        }
+
+        // 録音データをBlobとして取得
+        async function fetchAudioBlob(url) {
+            const res = await fetch(url);
+            return await res.blob();
+        }
+
+        const unselectAllBtn = document.getElementById('unselectAllBtn');
+
+unselectAllBtn.addEventListener('click', () => {
+    document.querySelectorAll('.selectRecording').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+});
+
+        // 選択した録音を削除
+        deleteSelectedBtn.addEventListener('click', () => {
+            const selected = Array.from(document.querySelectorAll('.selectRecording:checked'))
+                .map(checkbox => Number(checkbox.dataset.id));
+
+            recordings = recordings.filter(rec => !selected.includes(rec.id));
+            localStorage.setItem("recordings", JSON.stringify(recordings));
+            renderRecordings();
+        });
+
+        // 全部削除
+        deleteAllBtn.addEventListener('click', () => {
+            if (confirm("本当に全部削除しますか？")) {
+                recordings = [];
+                localStorage.removeItem("recordings");
+                recordingCount = 0;
+                renderRecordings();
+            }
+        });
+
+        // 選択した録音をダウンロード
+        downloadSelectedBtn.addEventListener('click', async () => {
+            const selected = Array.from(document.querySelectorAll('.selectRecording:checked'))
+                .map(checkbox => Number(checkbox.dataset.id));
+
+            if (selected.length === 0) {
+                alert("録音を選択してください！");
+                return;
+            }
+
+            const zip = new JSZip();
+            for (const rec of recordings.filter(r => selected.includes(r.id))) {
+                const blob = await fetchAudioBlob(rec.audioURL);
+                zip.file(`${rec.title}.webm`, blob);
+            }
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(content);
+            link.download = "選択した録音.zip";
+            link.click();
+        });
+
+        // 全部ダウンロード
+        downloadAllBtn.addEventListener('click', async () => {
+            if (recordings.length === 0) {
+                alert("録音がありません！");
+                return;
+            }
+
+            const zip = new JSZip();
+            for (const rec of recordings) {
+                const blob = await fetchAudioBlob(rec.audioURL);
+                zip.file(`${rec.title}.webm`, blob);
+            }
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(content);
+            link.download = "全部の録音.zip";
+            link.click();
+        });
+
+        sortSelect.addEventListener('change', renderRecordings);
+
+        const searchInput = document.getElementById("searchInput");
+        searchInput.addEventListener("input", () => {
+            renderRecordings();
+        });
+
+        renderRecordings();
+        
+    </script>
+
+<div id="footerLinks" style="
+position:fixed;
+right:10px;
+bottom:10px;
+background:#fff;
+border:1px solid #ccc;
+padding:8px 12px;
+border-radius:10px;
+font-size:12px;
+box-shadow:0 2px 6px rgba(0,0,0,0.1);
+z-index:9999;">
+<a href="#" onclick="openPolicy('contact')">お問い合わせ</a> |
+<a href="#" onclick="openPolicy('refund')">返金ポリシー</a> |
+<a href="#" onclick="openPolicy('cancel')">解約ポリシー</a> |
+<a href="#" onclick="openPolicy('promo')">プロモーション規約</a>　|
+<a href="#" onclick="openPolicy('transaction')">特定商取引法に基づく表記</a>
+</div>
+
+    <div id="policyModal" style="
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.5);
+z-index:10000;">
+<div style="
+background:#fff;
+max-width:600px;
+margin:60px auto;
+padding:20px;
+border-radius:12px;
+max-height:70vh;
+overflow:auto;">
+<button onclick="closePolicy()" style="float:right;">閉じる</button>
+<div id="policyContent"></div>
+</div>
+</div>
+
+    <script>
+function openPolicy(type){
+  const box = document.getElementById('policyModal');
+  const content = document.getElementById('policyContent');
+
+  if(type==='contact'){
+    content.innerHTML = `
+<h3>お問い合わせ</h3>
+<p>こちらのフォームからお問い合わせください。</p>
+<p><a href="https://forms.gle/Dzt1aaVhb5sdBBhP8" target="_blank">お問い合わせフォーム</a></p>
+`;
+  }
+
+  if(type==='refund'){
+    content.innerHTML = `
+<h3>返金ポリシー</h3>
+<p>決済日から7日以内は返金申請を受け付けます。以降は返金不可です。</p>
+`;
+  }
+
+  if(type==='cancel'){
+    content.innerHTML = `
+<h3>解約ポリシー</h3>
+<p>サブスクリプションはいつでも停止できます。停止後は次回請求は発生しません。</p>
+`;
+  }
+
+  if(type==='promo'){
+    content.innerHTML = `
+<h3>プロモーション規約</h3>
+<p>キャンペーンは予告なく終了する場合があります。</p>
+`;
+  }
+
+          if(type==='transaction'){
+    content.innerHTML = `
+<h3>特定商取引法に基づく表記</h3>
+<p>法人名：請求があった場合は遅滞なく開示します</p>
+<p>住所：請求があった場合には速やかに開示いたします</p>
+<p>住所：請求があった場合には速やかに開示いたします</p>
+<p>メールアドレス：kuso-mamireya@ymail.ne.jp</p>
+<p>運営責任者：村瀬美咲</p>
+<p>追加手数料：無し</p>
+<p>交換および返品に関するポリシー：サブスクリプションはいつでも解約可能です。解約後は次回更新日以降の請求は発生しません。
+すでに支払われた期間分の料金については返金できません。</p>
+<p>配達時間：支払い完了後すぐに利用可能です。</p>
+<p>利用可能な決済手段：クレジットカードまたは国内の銀行振込</p>
+<p>決済期間：クレジットカード決済はただちに処理されますが、国内の銀行振込は注文から 3 日以内に送金する必要があります。</p>
+<p>価格：月500円</p>
+<p>動作環境：Chromeブラウザ推奨</p>
+`;
+  }
+
+  box.style.display='block';
+}
+
+function closePolicy(){
+  document.getElementById('policyModal').style.display='none';
+}
+</script>
+    
+</body>
+</html>
