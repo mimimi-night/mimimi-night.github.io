@@ -388,8 +388,12 @@ const summary = data.candidates[0].content.parts[0].text;
             const resultDiv = btn.nextElementSibling;
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = '<strong>AI要約：</strong><br>' + summary.replace(/\n/g, '<br>');
-        } catch(e) {
-            alert('エラー: ' + e.message);
+      } catch(e) {
+    if (e.message && e.message.includes('429')) {
+        alert('アクセスが集中しています。しばらく待ってからもう一度お試しください');
+    } else {
+        alert('要約に失敗しました。もう一度お試しください');
+    }
         } finally {
             btn.textContent = 'AIで要約する';
             btn.disabled = false;
