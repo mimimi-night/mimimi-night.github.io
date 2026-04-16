@@ -90,7 +90,7 @@ align-items:center;">
     <p id="liveText">ここに録音中の文字が表示されます...</p>
  <button id="summarizeBtn" style="margin:10px; padding:8px 12px; cursor:pointer; display:none;"> AIで要約する</button>
 <div id="summaryResult" style="background:#fff; padding:10px; margin:10px 0; border-radius:8px; display:none;"></div>
-    <p id="recordingStatus" style="color: red; font-weight: bold; display: none;">🎙️ 録音中...</p>
+    <p id="recordingStatus" style="color: red; font-weight: bold; display: none;"> 録音中...</p>
     <div id="recordings"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
@@ -345,7 +345,7 @@ recordingStatus.style.display = "none";
     <audio controls src="${rec.audioURL}"></audio>
     <p>⏱ 長さ: ${rec.duration}秒</p>
     <p>📝 <strong>文字起こし:</strong><br>${rec.transcript || "（文字なし）"}</p>
-    <button class="aiSummarizeBtn" data-transcript="${rec.transcript || ''}">✨ AIで要約する</button>
+    <button class="aiSummarizeBtn" data-transcript="${rec.transcript || ''}">AIで要約する</button>
     <div class="summaryResult" style="background:#f0f8ff; padding:10px; margin:5px 0; border-radius:8px; display:none;"></div>
 `;
 
@@ -382,11 +382,11 @@ document.querySelectorAll('.aiSummarizeBtn').forEach(btn => {
             const summary = data.candidates[0].content.parts[0].text;
             const resultDiv = btn.nextElementSibling;
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '<strong>📝 AI要約：</strong><br>' + summary.replace(/\n/g, '<br>');
+            resultDiv.innerHTML = '<strong>AI要約：</strong><br>' + summary.replace(/\n/g, '<br>');
         } catch(e) {
             alert('要約に失敗しました。少し待ってから試してください！');
         } finally {
-            btn.textContent = '✨ AIで要約する';
+            btn.textContent = 'AIで要約する';
             btn.disabled = false;
         }
     });
