@@ -386,7 +386,7 @@ const transcript = rec ? rec.transcript : '';
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = '<strong>AI要約：</strong><br>' + summary.replace(/\n/g, '<br>');
         } catch(e) {
-            alert('要約に失敗しました。少し待ってから試してください！');
+            alert('エラー: ' + e.message);
         } finally {
             btn.textContent = 'AIで要約する';
             btn.disabled = false;
