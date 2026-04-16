@@ -344,9 +344,9 @@ recordingStatus.style.display = "none";
     <p>（${rec.date}）</p>
     <audio controls src="${rec.audioURL}"></audio>
     <p>⏱ 長さ: ${rec.duration}秒</p>
-    <p>📝 <strong>文字起こし:</strong><br>${rec.transcript || "（文字なし）"}</p>
-    <button class="aiSummarizeBtn" data-transcript="${rec.transcript || ''}">AIで要約する</button>
-    <div class="summaryResult" style="background:#f0f8ff; padding:10px; margin:5px 0; border-radius:8px; display:none;"></div>
+    <p>　<strong>文字起こし:</strong><br>${rec.transcript || "（文字なし）"}</p>
+<button class="aiSummarizeBtn" data-id="${rec.id}">AIで要約する</button>
+<div class="summaryResult" style="background:#f0f8ff; padding:10px; margin:5px 0; border-radius:8px; display:none;"></div>
 `;
 
                 recordingsDiv.appendChild(recordItem);
@@ -365,8 +365,10 @@ recordingStatus.style.display = "none";
             });
 document.querySelectorAll('.aiSummarizeBtn').forEach(btn => {
     btn.addEventListener('click', async () => {
-        const transcript = btn.dataset.transcript;
-        if (!transcript || transcript === '（文字なし）') {
+const recId = Number(btn.dataset.id);
+const rec = recordings.find(r => r.id === recId);
+const transcript = rec ? rec.transcript : '';
+     if (!transcript || transcript === '（文字なし）') {
             alert('文字起こしがありません！');
             return;
         }
