@@ -381,7 +381,10 @@ const transcript = rec ? rec.transcript : '';
     body: JSON.stringify({ transcript: transcript })
 });
             const data = await response.json();
-            const summary = data.candidates[0].content.parts[0].text;
+if (!data.candidates || !data.candidates[0]) {
+    throw new Error('Geminiエラー: ' + JSON.stringify(data));
+}
+const summary = data.candidates[0].content.parts[0].text;
             const resultDiv = btn.nextElementSibling;
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = '<strong>AI要約：</strong><br>' + summary.replace(/\n/g, '<br>');
