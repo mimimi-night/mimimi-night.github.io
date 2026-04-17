@@ -174,9 +174,13 @@ if (params.get('pro') === '1') {
 updatePlanUI();
         
         // 録音番号を過去データから計算
-        let recordingCount = recordings.length > 0
-            ? Math.max(...recordings.map(r => parseInt(r.title.replace("Recording ", ""))))
-            : 0;
+     let recordingCount = recordings.length > 0
+    ? Math.max(...recordings.map(r => {
+        const num = parseInt(r.title.replace("Recording ", "").replace("Recording", ""));
+        return isNaN(num) ? 0 : num;
+      }).filter(n => n >= 0))
+    : 0;
+if (isNaN(recordingCount)) recordingCount = 0;
 
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
