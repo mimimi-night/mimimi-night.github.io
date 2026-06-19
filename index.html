@@ -3,34 +3,100 @@
 <head>
 <meta charset="UTF-8">
 <title>mimimi-night - 無料ブラウザアプリ集</title>
-<meta name="description" content="インストール不要・アカウント登録不要で使える無料ブラウザアプリを公開しています。">
+<meta name="description" content="インストール不要・アカウント登録不要で使える無料ブラウザアプリを公開しています。録音メモ・クローゼット管理・名前変換など。">
 <meta name="robots" content="index,follow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px;}
-h1{text-align:center;margin-bottom:10px;}
-p{text-align:center;color:#555;}
-.apps{max-width:600px;margin:30px auto;display:flex;flex-direction:column;gap:15px;}
-.app-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);text-decoration:none;color:#333;}
-.app-card h2{margin:0 0 8px;}
-.app-card p{text-align:left;margin:0;color:#666;}
+*{box-sizing:border-box;}
+body{font-family:'Hiragino Sans',Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#333;line-height:1.7;}
+header{text-align:center;padding:40px 20px 20px;}
+header h1{font-size:28px;margin-bottom:10px;}
+header p{color:#555;font-size:15px;max-width:600px;margin:0 auto;}
+.apps{max-width:700px;margin:30px auto;display:flex;flex-direction:column;gap:24px;}
+.app-card{background:#fff;border-radius:14px;padding:28px;box-shadow:0 2px 10px rgba(0,0,0,0.08);text-decoration:none;color:#333;display:block;}
+.app-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.14);}
+.app-card h2{margin:0 0 10px;font-size:20px;}
+.app-card .desc{color:#444;margin:0 0 12px;font-size:14px;}
+.app-card .detail{color:#666;font-size:13px;line-height:1.8;}
+.tag{display:inline-block;background:#e8f4fd;color:#2980b9;font-size:11px;padding:3px 8px;border-radius:20px;margin-right:6px;margin-bottom:4px;}
+.about{max-width:700px;margin:10px auto 40px;background:#fff;border-radius:14px;padding:28px;box-shadow:0 2px 10px rgba(0,0,0,0.08);}
+.about h2{font-size:18px;margin-bottom:12px;}
+.about p{font-size:14px;color:#555;margin:0 0 10px;}
+footer{text-align:center;color:#aaa;font-size:12px;padding:20px;}
 </style>
 </head>
 <body>
-<h1>mimimi-night アプリ一覧</h1>
-<p>インストール不要・アカウント登録不要で使える無料ブラウザアプリです。</p>
+
+<header>
+  <h1>mimimi-night アプリ一覧</h1>
+  <p>インストール不要・アカウント登録不要で使える無料ブラウザアプリを公開しています。スマートフォンでもパソコンでもそのまま使えます。</p>
+</header>
+
 <div class="apps">
-<a class="app-card" href="/voice-recorder.html">
-  <h2>🎙️ シンプル録音メモくん</h2>
-    <p>ブラウザだけで音声を録音・文字起こし・保存。無料3件／無制限版あり。</p>
+
+  <a class="app-card" href="/voice-recorder/">
+    <h2>シンプル録音メモくん</h2>
+    <p class="desc">ブラウザだけで音声を録音・再生・保存できる録音メモアプリです。</p>
+    <p class="detail">
+      会議の議事録、アイデアのメモ、語学学習の発音チェックなど、さまざまな用途で活用できます。
+      録音した音声はAIが自動で要約してくれるため、長い録音内容をすばやく確認できます。
+      無料プランでは3件まで保存可能。月額500円のプレミアムプランで保存件数無制限になります。
+      アカウント登録不要でそのまま使えるため、手軽に始められます。
+    </p>
+    <div>
+      <span class="tag">録音</span>
+      <span class="tag">AI要約</span>
+      <span class="tag">無料</span>
+      <span class="tag">ブラウザ対応</span>
+    </div>
   </a>
+
   <a class="app-card" href="/my-closet/">
-    <h2>👗 マイクローゼット</h2>
-    <p>持っている服を管理・コーディネートを記録できるアプリ。</p>
+    <h2>あなたクローゼット</h2>
+    <p class="desc">持っている服を写真で登録して管理できるクローゼット管理アプリです。</p>
+    <p class="detail">
+      服の写真を撮ってカテゴリ・季節・テイストごとに整理できます。
+      写真から自動でメインカラーを診断する機能があり、色別に服を絞り込んで検索することも可能です。
+      着用回数や最後に着た日を記録できるため、長期間着ていない服を把握するのに役立ちます。
+      月額300円のプレミアムプランでは、AIコーデ提案機能とクローゼット統計機能が使えます。
+      英語版「LookBookCheck」もあり、海外ユーザーにも対応しています。
+    </p>
+    <div>
+      <span class="tag">クローゼット管理</span>
+      <span class="tag">コーデ提案</span>
+      <span class="tag">AIカラー診断</span>
+      <span class="tag">日英対応</span>
+    </div>
   </a>
+
   <a class="app-card" href="/name-country/">
-    <h2>🌍 国名アプリ</h2>
-    <p>世界の国名を学べるアプリ。</p>
+    <h2>名前の国別ランキング変換</h2>
+    <p class="desc">自分の名前が海外の国ではどのくらいの順位の名前に相当するかを調べられるサービスです。</p>
+    <p class="detail">
+      日本での名前の順位を入力すると、アメリカ・フランス・韓国など世界各国での相当する順位の名前を表示します。
+      「自分の名前が外国だったらどんな名前になるんだろう？」という純粋な興味から生まれたサービスです。
+      友達や家族の名前で試したり、語学学習のきっかけとして使ったりと、楽しみ方はさまざまです。
+    </p>
+    <div>
+      <span class="tag">名前</span>
+      <span class="tag">国際</span>
+      <span class="tag">ランキング</span>
+      <span class="tag">無料</span>
+    </div>
   </a>
+
 </div>
+
+<div class="about">
+  <h2>このサイトについて</h2>
+  <p>mimimi-nightは、日常生活をちょっと便利にするブラウザアプリを個人で開発・公開しています。</p>
+  <p>すべてのアプリはインストール不要・アカウント登録不要で使えることを大切にしています。スマートフォンのブラウザからそのままアクセスして使えます。</p>
+  <p>アプリの開発にはFirebase・Stripe・Claude APIなどを活用しています。ご意見・ご要望は各アプリ内のお問い合わせフォームからお気軽にどうぞ。</p>
+</div>
+
+<footer>
+  &copy; 2024 mimimi-night
+</footer>
+
 </body>
 </html>
