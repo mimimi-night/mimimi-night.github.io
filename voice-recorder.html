@@ -63,7 +63,9 @@ gap:12px;
 align-items:center;"> 
 <div id="planText">
 現在：無料版（残り <span id="remain">3</span> 件）
-</div>  <a id="buyLink" href="https://buy.stripe.com/28EeVe1uAfta3Xw4SlfUQ00" target="_blank" rel="noopener" style="background:#111;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;">無制限版にする（¥500）</a>
+</div>  <button id="buyLink" type="button" style="background:#111;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;">無制限版にする（月額500円）</button>
+<button id="manageBtn" type="button" style="display:none;background:#fff;color:#111;border:1px solid #111;padding:8px 14px;border-radius:8px;cursor:pointer;">お支払い・解約の管理</button>
+<span id="accountArea" style="font-size:12px;color:#555;"></span>
 </div>
     <div id="controls">
         <button id="startBtn">録音開始</button>
@@ -130,47 +132,31 @@ if (recognition) {
         let recordings = JSON.parse(localStorage.getItem("recordings") || "[]");
 const FREE_LIMIT = 3;
 
-let isPro = localStorage.getItem('isPro') === '1';
-let freeRemain = parseInt(localStorage.getItem('freeRemain') ?? String(FREE_LIMIT), 10);
-
-if (Number.isNaN(freeRemain)) freeRemain = FREE_LIMIT;
-if (freeRemain < 0) freeRemain = 0;
-if (freeRemain > FREE_LIMIT) freeRemain = FREE_LIMIT;
-
+// 無制限版かどうかは、ログインしたあとサーバー（Firestore）の記録で決まる
+let isPro = false;
+window.setPro = function(v){ isPro = !!v; updatePlanUI(); };
+window.isProNow = function(){ return isPro; };
 const buyLink = document.getElementById('buyLink');
-const planTextEl = document.getElementById('planText');
-
-const params = new URLSearchParams(location.search);
-if (params.get('pro') === '1') {
-  localStorage.setItem('isPro', '1');
-  isPro = true;
-  history.replaceState({}, '', location.pathname);
-}
 
 function updatePlanUI() {
   const planTextEl = document.getElementById('planText');
-  const remainEl = document.getElementById('remain');
   const startBtn = document.getElementById('startBtn');
-
+  const manageBtn = document.getElementById('manageBtn');
   if (!planTextEl) return;
 
   if (isPro) {
     planTextEl.textContent = '現在: 無制限版';
     if (buyLink) buyLink.style.display = 'none';
-    if (startBtn) startBtn.disabled = false;
+    if (manageBtn) manageBtn.style.display = '';
+    if (startBtn && !isRecording) startBtn.disabled = false;
     return;
   }
 
-  planTextEl.innerHTML = `現在: 無料版（残り <span id="remain">${freeRemain}</span> 件）`;
-
-  if (startBtn) startBtn.disabled = freeRemain <= 0;
-}
-        
-// ?pro=1 で着地したら無制限を有効化（テスト運用用）
-if (params.get('pro') === '1') {
-  localStorage.setItem('isPro', '1');
-  isPro = true;
-  history.replaceState({}, '', location.pathname); // URLをきれいに戻す
+  const remain = Math.max(0, FREE_LIMIT - recordings.length);
+  planTextEl.innerHTML = `現在: 無料版（残り <span id="remain">${remain}</span> 件）`;
+  if (buyLink) buyLink.style.display = '';
+  if (manageBtn) manageBtn.style.display = 'none';
+  if (startBtn && !isRecording) startBtn.disabled = remain <= 0;
 }
 updatePlanUI();
         
@@ -309,6 +295,7 @@ recordingStatus.style.display = "none";
         });
 
         function renderRecordings() {
+            updatePlanUI();
             recordingsDiv.innerHTML = "";
 
             const keyword = normalizeText(searchInput.value);
@@ -593,5 +580,109 @@ function closePolicy(){
 }
 </script>
     
+
+<div id="loginModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10001;align-items:center;justify-content:center;padding:16px;">
+<div style="background:#fff;max-width:360px;width:100%;padding:20px;border-radius:12px;box-sizing:border-box;">
+<h3 style="margin-top:0;">ログイン / 新規登録</h3>
+<p style="font-size:12px;color:#555;line-height:1.6;">無制限版のお支払い状況を確認するためにログインします。録音データはこれまでどおり、この端末の中だけに保存されます。</p>
+<input id="loginEmail" type="email" autocomplete="email" placeholder="メールアドレス" style="width:100%;padding:10px;margin:6px 0;box-sizing:border-box;">
+<input id="loginPassword" type="password" autocomplete="current-password" placeholder="パスワード（6文字以上）" style="width:100%;padding:10px;margin:6px 0;box-sizing:border-box;">
+<p id="loginError" style="color:#c00;font-size:12px;min-height:1em;margin:4px 0;"></p>
+<button id="doLogin" type="button" style="width:100%;padding:10px;background:#111;color:#fff;border:none;border-radius:8px;margin:4px 0;">ログイン</button>
+<button id="doSignup" type="button" style="width:100%;padding:10px;background:#fff;color:#111;border:1px solid #111;border-radius:8px;margin:4px 0;">新規登録</button>
+<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;">
+<a href="#" id="doReset">パスワードを忘れた方</a><a href="#" id="closeLogin">閉じる</a>
+</div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+const app = initializeApp({ apiKey:"AIzaSyDoQlri0Yl5CWOWROVz3lcpV-m5RZtWEn4", authDomain:"my-closet-21d11.firebaseapp.com", projectId:"my-closet-21d11", storageBucket:"my-closet-21d11.firebasestorage.app", messagingSenderId:"709312024370", appId:"1:709312024370:web:2a9cca87b06a2344e2112b" });
+const auth = getAuth(app);
+const db = getFirestore(app);
+const STRIPE_URL = 'https://buy.stripe.com/28EeVe1uAfta3Xw4SlfUQ00';
+const PORTAL_URL = 'https://billing.stripe.com/p/login/28EeVe1uAfta3Xw4SlfUQ00';
+const $ = id => document.getElementById(id);
+let user = null;
+
+const params = new URLSearchParams(location.search);
+const paid = params.get('paid') === '1';
+if (paid) history.replaceState({}, '', location.pathname);
+
+function openLogin(){ $('loginError').textContent=''; $('loginModal').style.display='flex'; }
+function closeLogin(){ $('loginModal').style.display='none'; }
+$('closeLogin').onclick = e => { e.preventDefault(); closeLogin(); };
+$('doLogin').onclick = async () => {
+  const e=$('loginEmail').value.trim(), p=$('loginPassword').value;
+  if(!e||!p){ $('loginError').textContent='メールアドレスとパスワードを入力してください'; return; }
+  try{ await signInWithEmailAndPassword(auth,e,p); }catch(err){ $('loginError').textContent='ログインできませんでした。メールアドレスとパスワードを確認してください'; }
+};
+$('doSignup').onclick = async () => {
+  const e=$('loginEmail').value.trim(), p=$('loginPassword').value;
+  if(!e||!p){ $('loginError').textContent='メールアドレスとパスワードを入力してください'; return; }
+  try{ await createUserWithEmailAndPassword(auth,e,p); }catch(err){ $('loginError').textContent='登録できませんでした。すでに登録ずみか、パスワードが短すぎる可能性があります'; }
+};
+$('doReset').onclick = async ev => {
+  ev.preventDefault();
+  const e=$('loginEmail').value.trim();
+  if(!e){ $('loginError').textContent='メールアドレスとパスワードを入力してください'; return; }
+  try{ await sendPasswordResetEmail(auth,e); }catch(err){}
+  $('loginError').textContent='パスワード再設定のメールを送りました';
+};
+
+$('buyLink').onclick = () => {
+  if(!user){ openLogin(); return; }
+  const u = new URL(STRIPE_URL);
+  u.searchParams.set('client_reference_id', 'rec_' + user.uid);
+  if(user.email) u.searchParams.set('prefilled_email', user.email);
+  location.href = u.toString();
+};
+$('manageBtn').onclick = () => {
+  const u = new URL(PORTAL_URL);
+  if(user && user.email) u.searchParams.set('prefilled_email', user.email);
+  window.open(u.toString(), '_blank', 'noopener');
+};
+
+async function readPro(uid){
+  try{ const s = await getDoc(doc(db,'users',uid)); return s.exists() && s.data().recorderPro === true; }
+  catch(e){ console.error(e); return false; }
+}
+
+function renderAccount(){
+  const area = $('accountArea');
+  area.textContent = '';
+  const a = document.createElement('a'); a.href = '#';
+  if(user){
+    area.append((user.email || '') + ' ');
+    a.textContent = 'ログアウト';
+    a.onclick = e => { e.preventDefault(); signOut(auth); };
+  }else{
+    a.textContent = 'ログイン';
+    a.onclick = e => { e.preventDefault(); openLogin(); };
+  }
+  area.append(a);
+}
+
+onAuthStateChanged(auth, async u => {
+  user = u; renderAccount();
+  if(!u){
+    window.setPro(false);
+    if(paid){ alert('お支払いありがとうございます！無制限版を有効にするためにログインしてください。'); openLogin(); }
+    return;
+  }
+  closeLogin();
+  let pro = await readPro(u.uid);
+  window.setPro(pro);
+  if(paid){
+    for(let i=0;i<15&&!pro;i++){ await new Promise(r=>setTimeout(r,2000)); pro = await readPro(u.uid); }
+    window.setPro(pro);
+    alert(pro ? '無制限版へようこそ！録音を何件でも保存できます。' : 'お支払いを確認しています。数分たっても切りかわらない場合は、ページを再読み込みしてください。');
+  }
+});
+</script>
 </body>
 </html>
