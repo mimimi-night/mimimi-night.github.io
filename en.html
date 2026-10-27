@@ -130,6 +130,35 @@ if (recognition) {
         let mediaRecorder;
         let audioChunks = [];
         let recordings = JSON.parse(localStorage.getItem("recordings") || "[]");
+
+// 音声はブラウザの保管庫（IndexedDB）に保存する。localStorage には文字だけを入れる
+const NO_AUDIO_MSG = 'Audio for this recording was not saved (recorded with an older version).';
+const audioUrlCache = {};
+function audioDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('voiceMemoAudio',1); r.onupgradeneeded=()=>r.result.createObjectStore('audio'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function audioTx(mode, fn){ const db=await audioDB(); return new Promise((res,rej)=>{ const tx=db.transaction('audio',mode); const req=fn(tx.objectStore('audio')); tx.oncomplete=()=>res(req&&req.result); tx.onerror=()=>rej(tx.error); }); }
+const saveAudio = (id, blob) => audioTx('readwrite', s => s.put(blob, id));
+const loadAudio = id => audioTx('readonly', s => s.get(id));
+function forgetUrl(id){ if(audioUrlCache[id]){ URL.revokeObjectURL(audioUrlCache[id]); delete audioUrlCache[id]; } }
+const deleteAudio = id => { forgetUrl(id); return audioTx('readwrite', s => s.delete(id)).catch(console.error); };
+const clearAudio = () => { Object.keys(audioUrlCache).forEach(forgetUrl); return audioTx('readwrite', s => s.clear()).catch(console.error); };
+async function getAudioBlob(rec){ try{ return (await loadAudio(rec.id)) || null; }catch(e){ console.error(e); return null; } }
+async function getAudioURL(id){
+  if(audioUrlCache[id]) return audioUrlCache[id];
+  const b = await loadAudio(id).catch(() => null);
+  if(!b) return null;
+  return audioUrlCache[id] = URL.createObjectURL(b);
+}
+async function attachAudio(){
+  for(const el of document.querySelectorAll('audio[data-audio-id]')){
+    const url = await getAudioURL(Number(el.dataset.audioId));
+    if(url){ el.src = url; continue; }
+    const p = document.createElement('p');
+    p.style.cssText = 'color:#999;font-size:12px;';
+    p.textContent = NO_AUDIO_MSG;
+    el.replaceWith(p);
+  }
+}
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 const FREE_LIMIT = 3;
 
 // 無制限版かどうかは、ログインしたあとサーバー（Firestore）の記録で決まる
@@ -200,12 +229,15 @@ if (isNaN(recordingCount)) recordingCount = 0;
                 const newRecording = {
                     id: Date.now(),
                     title,
-                    audioURL,
+                    hasAudio: true,
                     transcript: finalTranscript || tempTranscript || "(No transcription)",
                     date,
                     duration: Math.round(audioBlob.size / 16000)
                 };
 
+                audioUrlCache[newRecording.id] = audioURL;
+                try { await saveAudio(newRecording.id, audioBlob); }
+                catch (e) { console.error(e); alert('Could not save the audio. Please check your browser storage space.'); }
                 recordings.push(newRecording);
                 localStorage.setItem("recordings", JSON.stringify(recordings));
 
@@ -296,6 +328,7 @@ recordingStatus.style.display = "none";
 
         function renderRecordings() {
             updatePlanUI();
+            setTimeout(attachAudio, 0);
             recordingsDiv.innerHTML = "";
 
             const keyword = normalizeText(searchInput.value);
@@ -329,7 +362,7 @@ recordingStatus.style.display = "none";
                     <input type="checkbox" class="selectRecording" data-id="${rec.id}">
                     <input type="text" class="editTitle" data-id="${rec.id}" value="${rec.title}" />
                     <p>(${rec.date})</p>
-                    <audio controls src="${rec.audioURL}"></audio>
+                    <audio controls data-audio-id="${rec.id}"></audio>
                     <p>⏱ Length: ${rec.duration} sec</p>
                     <p> <strong>Transcription:</strong><br>${rec.transcript || "(No transcription)"}</p>
 <button class="aiSummarizeBtn" data-id="${rec.id}">✨ Summarize with AI</button>
@@ -372,6 +405,7 @@ unselectAllBtn.addEventListener('click', () => {
                 .map(checkbox => Number(checkbox.dataset.id));
 
             recordings = recordings.filter(rec => !selected.includes(rec.id));
+            selected.forEach(id => deleteAudio(id));
             localStorage.setItem("recordings", JSON.stringify(recordings));
             renderRecordings();
         });
@@ -380,6 +414,7 @@ unselectAllBtn.addEventListener('click', () => {
         deleteAllBtn.addEventListener('click', () => {
             if (confirm("Are you sure you want to delete all recordings?")) {
                 recordings = [];
+                clearAudio();
                 localStorage.removeItem("recordings");
                 recordingCount = 0;
                 renderRecordings();
@@ -398,7 +433,7 @@ unselectAllBtn.addEventListener('click', () => {
 
             const zip = new JSZip();
             for (const rec of recordings.filter(r => selected.includes(r.id))) {
-                const blob = await fetchAudioBlob(rec.audioURL);
+                const blob = await getAudioBlob(rec); if (!blob) continue;
                 zip.file(`${rec.title}.webm`, blob);
             }
 
@@ -418,7 +453,7 @@ unselectAllBtn.addEventListener('click', () => {
 
             const zip = new JSZip();
             for (const rec of recordings) {
-                const blob = await fetchAudioBlob(rec.audioURL);
+                const blob = await getAudioBlob(rec); if (!blob) continue;
                 zip.file(`${rec.title}.webm`, blob);
             }
 
