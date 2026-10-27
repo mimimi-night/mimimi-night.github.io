@@ -61,7 +61,9 @@ gap:12px;
 align-items:center;"> 
 <div id="planText">
 Current: Free Plan (Remaining <span id="remain">3</span> recordings)
-</div>  <a id="buyLink" href="https://buy.stripe.com/28EeVe1uAfta3Xw4SlfUQ00" target="_blank" rel="noopener" style="background:#111;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;">Upgrade to Unlimited </a>
+</div>  <button id="buyLink" type="button" style="background:#111;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;">Upgrade to Unlimited (¥500/month)</button>
+<button id="manageBtn" type="button" style="display:none;background:#fff;color:#111;border:1px solid #111;padding:8px 14px;border-radius:8px;cursor:pointer;">Manage billing / cancel</button>
+<span id="accountArea" style="font-size:12px;color:#555;"></span>
 </div>
     <div id="controls">
         <button id="startBtn">Start Recording</button>
@@ -130,47 +132,31 @@ if (recognition) {
         let recordings = JSON.parse(localStorage.getItem("recordings") || "[]");
 const FREE_LIMIT = 3;
 
-let isPro = localStorage.getItem('isPro') === '1';
-let freeRemain = parseInt(localStorage.getItem('freeRemain') ?? String(FREE_LIMIT), 10);
-
-if (Number.isNaN(freeRemain)) freeRemain = FREE_LIMIT;
-if (freeRemain < 0) freeRemain = 0;
-if (freeRemain > FREE_LIMIT) freeRemain = FREE_LIMIT;
-
+// 無制限版かどうかは、ログインしたあとサーバー（Firestore）の記録で決まる
+let isPro = false;
+window.setPro = function(v){ isPro = !!v; updatePlanUI(); };
+window.isProNow = function(){ return isPro; };
 const buyLink = document.getElementById('buyLink');
-const planTextEl = document.getElementById('planText');
-
-const params = new URLSearchParams(location.search);
-if (params.get('pro') === '1') {
-  localStorage.setItem('isPro', '1');
-  isPro = true;
-  history.replaceState({}, '', location.pathname);
-}
 
 function updatePlanUI() {
   const planTextEl = document.getElementById('planText');
-  const remainEl = document.getElementById('remain');
   const startBtn = document.getElementById('startBtn');
-
+  const manageBtn = document.getElementById('manageBtn');
   if (!planTextEl) return;
 
   if (isPro) {
     planTextEl.textContent = 'Current: Unlimited Plan';
     if (buyLink) buyLink.style.display = 'none';
-    if (startBtn) startBtn.disabled = false;
+    if (manageBtn) manageBtn.style.display = '';
+    if (startBtn && !isRecording) startBtn.disabled = false;
     return;
   }
 
-  planTextEl.innerHTML = `Current: Free Plan（Remaining <span id="remain">${freeRemain}</span> recordings）`;
-
-  if (startBtn) startBtn.disabled = freeRemain <= 0;
-}
-        
-// ?pro=1 で着地したら無制限を有効化（テスト運用用）
-if (params.get('pro') === '1') {
-  localStorage.setItem('isPro', '1');
-  isPro = true;
-  history.replaceState({}, '', location.pathname); // URLをきれいに戻す
+  const remain = Math.max(0, FREE_LIMIT - recordings.length);
+  planTextEl.innerHTML = `Current: Free Plan（Remaining <span id="remain">${remain}</span> recordings）`;
+  if (buyLink) buyLink.style.display = '';
+  if (manageBtn) manageBtn.style.display = 'none';
+  if (startBtn && !isRecording) startBtn.disabled = remain <= 0;
 }
 updatePlanUI();
         
@@ -309,6 +295,7 @@ recordingStatus.style.display = "none";
         });
 
         function renderRecordings() {
+            updatePlanUI();
             recordingsDiv.innerHTML = "";
 
             const keyword = normalizeText(searchInput.value);
@@ -619,5 +606,109 @@ function closePolicy(){
 }
 </script>
     
+
+<div id="loginModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10001;align-items:center;justify-content:center;padding:16px;">
+<div style="background:#fff;max-width:360px;width:100%;padding:20px;border-radius:12px;box-sizing:border-box;">
+<h3 style="margin-top:0;">Log in / Sign up</h3>
+<p style="font-size:12px;color:#555;line-height:1.6;">Log in so we can confirm your Unlimited plan. Your recordings stay on this device only, as before.</p>
+<input id="loginEmail" type="email" autocomplete="email" placeholder="Email" style="width:100%;padding:10px;margin:6px 0;box-sizing:border-box;">
+<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password (6+ characters)" style="width:100%;padding:10px;margin:6px 0;box-sizing:border-box;">
+<p id="loginError" style="color:#c00;font-size:12px;min-height:1em;margin:4px 0;"></p>
+<button id="doLogin" type="button" style="width:100%;padding:10px;background:#111;color:#fff;border:none;border-radius:8px;margin:4px 0;">Log in</button>
+<button id="doSignup" type="button" style="width:100%;padding:10px;background:#fff;color:#111;border:1px solid #111;border-radius:8px;margin:4px 0;">Sign up</button>
+<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;">
+<a href="#" id="doReset">Forgot password?</a><a href="#" id="closeLogin">Close</a>
+</div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+const app = initializeApp({ apiKey:"AIzaSyDoQlri0Yl5CWOWROVz3lcpV-m5RZtWEn4", authDomain:"my-closet-21d11.firebaseapp.com", projectId:"my-closet-21d11", storageBucket:"my-closet-21d11.firebasestorage.app", messagingSenderId:"709312024370", appId:"1:709312024370:web:2a9cca87b06a2344e2112b" });
+const auth = getAuth(app);
+const db = getFirestore(app);
+const STRIPE_URL = 'https://buy.stripe.com/28EeVe1uAfta3Xw4SlfUQ00';
+const PORTAL_URL = 'https://billing.stripe.com/p/login/28EeVe1uAfta3Xw4SlfUQ00';
+const $ = id => document.getElementById(id);
+let user = null;
+
+const params = new URLSearchParams(location.search);
+const paid = params.get('paid') === '1';
+if (paid) history.replaceState({}, '', location.pathname);
+
+function openLogin(){ $('loginError').textContent=''; $('loginModal').style.display='flex'; }
+function closeLogin(){ $('loginModal').style.display='none'; }
+$('closeLogin').onclick = e => { e.preventDefault(); closeLogin(); };
+$('doLogin').onclick = async () => {
+  const e=$('loginEmail').value.trim(), p=$('loginPassword').value;
+  if(!e||!p){ $('loginError').textContent='Please enter your email and password'; return; }
+  try{ await signInWithEmailAndPassword(auth,e,p); }catch(err){ $('loginError').textContent='Could not log in. Please check your email and password.'; }
+};
+$('doSignup').onclick = async () => {
+  const e=$('loginEmail').value.trim(), p=$('loginPassword').value;
+  if(!e||!p){ $('loginError').textContent='Please enter your email and password'; return; }
+  try{ await createUserWithEmailAndPassword(auth,e,p); }catch(err){ $('loginError').textContent='Could not sign up. The email may already be registered, or the password is too short.'; }
+};
+$('doReset').onclick = async ev => {
+  ev.preventDefault();
+  const e=$('loginEmail').value.trim();
+  if(!e){ $('loginError').textContent='Please enter your email and password'; return; }
+  try{ await sendPasswordResetEmail(auth,e); }catch(err){}
+  $('loginError').textContent='We sent you a password reset email.';
+};
+
+$('buyLink').onclick = () => {
+  if(!user){ openLogin(); return; }
+  const u = new URL(STRIPE_URL);
+  u.searchParams.set('client_reference_id', 'rec_' + user.uid);
+  if(user.email) u.searchParams.set('prefilled_email', user.email);
+  location.href = u.toString();
+};
+$('manageBtn').onclick = () => {
+  const u = new URL(PORTAL_URL);
+  if(user && user.email) u.searchParams.set('prefilled_email', user.email);
+  window.open(u.toString(), '_blank', 'noopener');
+};
+
+async function readPro(uid){
+  try{ const s = await getDoc(doc(db,'users',uid)); return s.exists() && s.data().recorderPro === true; }
+  catch(e){ console.error(e); return false; }
+}
+
+function renderAccount(){
+  const area = $('accountArea');
+  area.textContent = '';
+  const a = document.createElement('a'); a.href = '#';
+  if(user){
+    area.append((user.email || '') + ' ');
+    a.textContent = 'Log out';
+    a.onclick = e => { e.preventDefault(); signOut(auth); };
+  }else{
+    a.textContent = 'Log in';
+    a.onclick = e => { e.preventDefault(); openLogin(); };
+  }
+  area.append(a);
+}
+
+onAuthStateChanged(auth, async u => {
+  user = u; renderAccount();
+  if(!u){
+    window.setPro(false);
+    if(paid){ alert('Thank you for your payment! Please log in to activate Unlimited.'); openLogin(); }
+    return;
+  }
+  closeLogin();
+  let pro = await readPro(u.uid);
+  window.setPro(pro);
+  if(paid){
+    for(let i=0;i<15&&!pro;i++){ await new Promise(r=>setTimeout(r,2000)); pro = await readPro(u.uid); }
+    window.setPro(pro);
+    alert(pro ? 'Welcome to Unlimited! You can now save as many recordings as you like.' : 'We are confirming your payment. If nothing changes in a few minutes, please reload the page.');
+  }
+});
+</script>
 </body>
 </html>
